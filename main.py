@@ -3,28 +3,29 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtCore import Qt
 import sys
 
+
 class TimeTable(QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         # 아이템 클릭 발생 시, log_time 메소드 호출
         self.itemClicked.connect(self.log_time)
 
-        #col, row 설정
+        # col, row 설정
         self.setColumnCount(7)
         self.setRowCount(24)
 
-        #날짜, 시간 설정
+        # 날짜, 시간 설정
         self.days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         self.hours = [str(i) for i in range(24)]
 
         # 표 생성
-        #날짜
+        # 날짜
         for i in range(7):
             day_item = QTableWidgetItem(self.days[i])
             self.setHorizontalHeaderItem(i, day_item)
 
-        #시간
+        # 시간
         for i in range(24):
             hour_item = QTableWidgetItem(self.hours[i])
             self.setVerticalHeaderItem(i, hour_item)
@@ -32,22 +33,21 @@ class TimeTable(QTableWidget):
         # 각 셀에 기본 QTableWidgetItem 생성
         for i in range(24):
             for j in range(7):
-                #행, 열, QTableWidgetItem을 입력 받아 초기 테이블 비워둠
+                # 행, 열, QTableWidgetItem을 입력 받아 초기 테이블 비워둠
                 self.setItem(i, j, QTableWidgetItem())
 
         # 불가능한 시간을 저장하는 리스트
         self.unavailable_hours = []
         self.last_clicked_item = None
 
-
     def log_time(self, item):
-        #현재 눌린 키를 확인,
+        # 현재 눌린 키를 확인,
         modifiers = QApplication.keyboardModifiers()
-        #쉬프트 키와 다른 키가 같이 눌렸는지 확인
+        # 쉬프트 키와 다른 키가 같이 눌렸는지 확인
         if modifiers == Qt.ShiftModifier and self.last_clicked_item is not None:
-            #시작 값
+            # 시작 값
             start_row = min(item.row(), self.last_clicked_item.row())
-            #끝 값
+            # 끝 값
             end_row = max(item.row(), self.last_clicked_item.row())
 
             # 현재 클릭 셀과 이전 클릭 셀의 열이 같은 열인가?
@@ -65,7 +65,7 @@ class TimeTable(QTableWidget):
 
     # 클릭한 셀 처리
     def handle_item_click(self, item):
-        #클릭 행 인덱스 가져옴
+        # 클릭 행 인덱스 가져옴
         column = item.column()
         row = item.row()
 
@@ -84,11 +84,19 @@ class TimeTable(QTableWidget):
                 item.setBackground(QColor('blue'))  # 셀 색상을 파란색으로 변경
             else:
                 self.unavailable_hours.remove(selected_time)  # 시간이 다시 클릭되면 가능한 시간으로 변경
-                item.setBackground(QColor('white'))   # 셀 색상 복원
+                item.setBackground(QColor('white'))  # 셀 색상 복원
 
             # print(f"Unavailable hours: {self.unavailable_hours}")
         else:
             print(f"Invalid index: column {column}, row {row}")
+
+    # 셀 초기화
+    def handle_item_clear(self):
+        self.unavailable_hours = []
+        for row in range(self.rowCount()):
+            for column in range(self.columnCount()):
+                item = self.item(row, column)
+                item.setBackground(QColor('white'))
 
     # 가능 시간 조회
     def available_hours(self):
@@ -102,25 +110,29 @@ class TimeTable(QTableWidget):
         for day in available_hours_dict:
             print(f"Available hours on {day}: {available_hours_dict[day]}")
 
+
 app = QApplication(sys.argv)
 
 # TimeTable 위젯 생성
 table = TimeTable()
 
 # QPushButton 생성 및 table의 available_hours 메소드에 연결
-button = QPushButton("Show Available Hours")
-button.clicked.connect(table.available_hours)
+btn_get_available_hours = QPushButton("Show Available Hours")
+btn_get_available_hours.clicked.connect(table.available_hours)
+
+btn_clear_available_hours = QPushButton("Clear")
+btn_clear_available_hours.clicked.connect(table.handle_item_clear)
 
 # QVBoxLayout 생성 후 table과 button 추가
 layout = QVBoxLayout()
 layout.addWidget(table)
-layout.addWidget(button)
+layout.addWidget(btn_get_available_hours)
+layout.addWidget(btn_clear_available_hours)
 
 # QWidget 생성, 레이아웃 설정 및 화면에 표시
 window = QWidget()
 window.setLayout(layout)
-window.resize(1280, 720) 
+window.resize(1280, 720)
 window.show()
 
 sys.exit(app.exec_())
-
