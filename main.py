@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QPushButton, QWidget
 from PyQt5.QtGui import QColor
+from PyQt5.QtCore import Qt
 import sys
 
 class TimeTable(QTableWidget):
@@ -29,8 +30,22 @@ class TimeTable(QTableWidget):
 
         # 불가능한 시간을 저장하는 리스트
         self.unavailable_hours = []
+        self.last_clicked_item = None
 
     def log_time(self, item):
+        modifiers = QApplication.keyboardModifiers()
+        if modifiers == Qt.ShiftModifier and self.last_clicked_item is not None:
+            start_row = min(item.row(), self.last_clicked_item.row())
+            end_row = max(item.row(), self.last_clicked_item.row())
+            if item.column() == self.last_clicked_item.column():
+                for row in range(start_row, end_row + 1):
+                    self.handle_item_click(self.item(row, item.column()))
+        else:
+            self.handle_item_click(item)
+
+        self.last_clicked_item = item
+
+    def handle_item_click(self, item):
         column = item.column()
         row = item.row()
         # Check if the header items for the given indexes exist
@@ -48,7 +63,7 @@ class TimeTable(QTableWidget):
                 self.unavailable_hours.remove(selected_time)  # If the time is clicked again, make it available
                 item.setBackground(QColor('white'))  # Restore the cell color
 
-            # print(f"Unavailable hours: {self.unavailable_hours}")
+            print(f"Unavailable hours: {self.unavailable_hours}")
         else:
             print(f"Invalid index: column {column}, row {row}")
 
@@ -56,7 +71,7 @@ class TimeTable(QTableWidget):
         available_hours_dict = {day: list(self.hours) for day in self.days}
         for (day, hour) in self.unavailable_hours:
             available_hours_dict[day].remove(hour)
-        
+
         for day in available_hours_dict:
             print(f"Available hours on {day}: {available_hours_dict[day]}")
 
@@ -81,3 +96,4 @@ window.resize(1280, 720)  # Set the window size to 1280x720 pixels
 window.show()
 
 sys.exit(app.exec_())
+
