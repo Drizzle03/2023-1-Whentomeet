@@ -1,138 +1,137 @@
-from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QPushButton, QWidget
-from PyQt5.QtGui import QColor
-from PyQt5.QtCore import Qt
-import sys
+# 필요한 모듈을 임포트합니다.
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QLineEdit, QLabel, QStackedWidget
+from PyQt5.QtCore import Qt, QItemSelectionModel
+from api import TimeTable
+
+class ListWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        #윈도우 설정 (제목, 크기)
+        self.setWindowTitle("When to meet")
+        self.resize(1280, 720)  
+        self.layout = QVBoxLayout() 
+
+        self.saved_unavailable_hours = {} # 각 아이템의 불가능 시간 저장 dic
+        self.new_windows = []  # 모든 새 창 참조 보관
+
+        self.list_widget = QListWidget()
+        self.list_widget.setMinimumHeight(400)
+
+        # place holder
+        self.add_line_edit = QLineEdit()
+        self.add_line_edit.setPlaceholderText("Enter an item")  # 새로운 리스트 이름 추가
+        self.add_button = QPushButton("Add")  # Add 버튼
+        self.add_button.clicked.connect(self.add_item)  # Add 버튼 클릭 시 add_item 메서드 호출
+
+        # 선택된 리스트 삭제 버튼
+        self.remove_button = QPushButton("Remove Selected")
+        self.remove_button.clicked.connect(self.remove_selected_item)  # remove_selected_item 메서드 호출
+        self.remove_button.setMaximumHeight(50)  # 최대 높이 설정
+
+        # 페이지 이동 버튼
+        self.move_button = QPushButton("Move to Page")
+        self.move_button.clicked.connect(self.move_to_page)  # move_to_page 메서드 호출
+        self.move_button.setMaximumHeight(50)  # 최대 높이 설정
+
+        # Stacked Widget 생성, 다른 위젯들을 스택처럼 쌓아놓음
+        # 현재 페이지가 바뀔 때마다 update_current_page 메서드 호출
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.currentChanged.connect(self.update_current_page) 
+
+        # 레이아웃 위젯 추가 (첫 번째 수평, place holder, add창 추가)
+        self.layout.addWidget(self.list_widget)
+        add_layout = QHBoxLayout() 
+        add_layout.addWidget(self.add_line_edit) 
+        add_layout.addWidget(self.add_button)  
+        self.layout.addLayout(add_layout) 
+
+        # 레이아웃 위젯 추가 (두 번째 수평, 삭제, 페이지 이동 창 추가)
+        remove_move_layout = QHBoxLayout() 
+        remove_move_layout.addWidget(self.remove_button)
+        remove_move_layout.addWidget(self.move_button)
+        self.layout.addLayout(remove_move_layout)
+
+        self.layout.addWidget(self.stacked_widget)  # stacked_widget을 메인 레이아웃 추가
+
+        self.setLayout(self.layout)
+
+    def add_item(self):
+        item_text = self.add_line_edit.text()  # 아이템 추가 입력창 텍스트 가져옴
+        if item_text:  # 텍스트가 비어있지 않다면,
+            self.list_widget.addItem(item_text)  # 텍스트를 리스트 위젯에 아이템으로 추가
+            self.add_line_edit.clear()  # 아이템 추가 후 입력창을 비움
+
+            page_label = QLabel() 
+            self.stacked_widget.addWidget(page_label)  # stacked_widget에 페이지로 추가
+
+            # 새 아이템의 사용 불가 시간 초기화
+            self.saved_unavailable_hours[item_text] = []
+
+    def remove_selected_item(self):
+        selected_items = self.list_widget.selectedItems()  # 현재 선택된 아이템들을 가져옴
+        for item in selected_items:  # 각 선택된 아이템에 대해
+            row = self.list_widget.row(item)  # 아이템의 행 번호를 가져옴
+
+            # 아이템을 삭제할 때 사용 불가 시간도 삭제
+            del self.saved_unavailable_hours[item.text()]
+
+            self.list_widget.takeItem(row)  # 아이템을 리스트 위젯에서 제거
+            self.stacked_widget.removeWidget(self.stacked_widget.widget(row))  # 해당 아이템의 페이지를 stacked_widget에서 제거
+
+    def move_to_page(self):
+        selected_items = self.list_widget.selectedItems()  # 현재 선택된 아이템들을 가져옴
+        if selected_items:  # 선택된 아이템이 있다면
+            selected_item = selected_items[0]  # 첫 번째 선택된 아이템을 가져옴
+            row = self.list_widget.row(selected_item)  # 선택된 아이템의 행 번호를 가져옴
+
+            timetable_widget = TimeTable()  # TimeTable 위젯을 생성
+
+            # 선택된 아이템에 대해 저장된 사용 불가 시간을 로드
+            timetable_widget.unavailable_hours = self.saved_unavailable_hours[selected_item.text()]
+            timetable_widget.load_unavailable_hours()
+
+            # timetable_widget가 생성된 후에 신호를 연결합니다.
+            timetable_widget.unavailable_hours_changed.connect(
+                lambda: self.save_unavailable_hours(selected_item.text(), timetable_widget))
+
+            # "Show Available Hours" 버튼을 생성하고, 이 버튼이 클릭되면 timetable_widget의 available_hours 메소드를 호출하도록 연결합니다.
+            btn_get_available_hours = QPushButton("Show Available Hours")
+            btn_get_available_hours.clicked.connect(timetable_widget.available_hours)
+
+            # "Clear" 버튼을 생성하고, 이 버튼이 클릭되면 timetable_widget의 handle_item_clear 메소드를 호출하도록 연결합니다.
+            btn_clear_available_hours = QPushButton("Clear")
+            btn_clear_available_hours.clicked.connect(timetable_widget.handle_item_clear)
+
+            new_window = QWidget()  # 새로운 윈도우를 생성합니다.
+            layout = QVBoxLayout()  # 새로운 윈도우에 사용할 QVBoxLayout을 생성합니다.
+            layout.addWidget(timetable_widget)  # timetable_widget을 레이아웃에 추가합니다.
+            layout.addWidget(btn_get_available_hours)  # "Show Available Hours" 버튼을 레이아웃에 추가합니다.
+            layout.addWidget(btn_clear_available_hours)  # "Clear" 버튼을 레이아웃에 추가합니다.
+            new_window.setLayout(layout)  # 새로운 윈도우의 레이아웃을 방금 생성한 레이아웃으로 설정합니다.
+            new_window.setWindowTitle(f"Timetable for {selected_item.text()}")  # 새로운 윈도우의 제목을 설정합니다.
+
+            # 새 윈도우의 크기와 위치를 메인 윈도우와 동일하게 설정합니다.
+            new_window.setGeometry(self.geometry())
+
+            new_window.show()  # 새로운 윈도우를 보여줍니다.
+
+            self.new_windows.append(new_window)  # 가비지 컬렉션을 방지하기 위해 새 윈도우에 대한 참조를 유지합니다.
+
+    def update_current_page(self, index):
+        self.list_widget.clearSelection()  # 리스트 위젯의 선택을 모두 해제합니다.
+        if index >= 0:  # 인덱스가 유효하다면
+            selection_model = self.list_widget.selectionModel()  # 리스트 위젯의 선택 모델을 가져옵니다.
+            selection_model.select(self.list_widget.model().index(index, 0), QItemSelectionModel.Select)  # 새로운 페이지에 해당하는 아이템을 선택합니다.
+
+    def save_unavailable_hours(self, item_text, timetable_widget):
+            # 선택한 아이템에 대한 사용 불가능한 시간을 저장합니다.
+            # timetable_widget의 사용 불가능한 시간 리스트를 복사하여 저장합니다.
+            self.saved_unavailable_hours[item_text] = list(timetable_widget.unavailable_hours)
 
 
-class TimeTable(QTableWidget):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # 아이템 클릭 발생 시, log_time 메소드 호출
-        self.itemClicked.connect(self.log_time)
-
-        # col, row 설정
-        self.setColumnCount(7)
-        self.setRowCount(24)
-
-        # 날짜, 시간 설정
-        self.days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        self.hours = [str(i) for i in range(24)]
-
-        # 표 생성
-        # 날짜
-        for i in range(7):
-            day_item = QTableWidgetItem(self.days[i])
-            self.setHorizontalHeaderItem(i, day_item)
-
-        # 시간
-        for i in range(24):
-            hour_item = QTableWidgetItem(self.hours[i])
-            self.setVerticalHeaderItem(i, hour_item)
-
-        # 각 셀에 기본 QTableWidgetItem 생성
-        for i in range(24):
-            for j in range(7):
-                # 행, 열, QTableWidgetItem을 입력 받아 초기 테이블 비워둠
-                self.setItem(i, j, QTableWidgetItem())
-
-        # 불가능한 시간을 저장하는 리스트
-        self.unavailable_hours = []
-        self.last_clicked_item = None
-
-    def log_time(self, item):
-        # 현재 눌린 키를 확인,
-        modifiers = QApplication.keyboardModifiers()
-        # 쉬프트 키와 다른 키가 같이 눌렸는지 확인
-        if modifiers == Qt.ShiftModifier and self.last_clicked_item is not None:
-            # 시작 값
-            start_row = min(item.row(), self.last_clicked_item.row())
-            # 끝 값
-            end_row = max(item.row(), self.last_clicked_item.row())
-
-            # 현재 클릭 셀과 이전 클릭 셀의 열이 같은 열인가?
-            if item.column() == self.last_clicked_item.column():
-                # start부터 end까지 반복하면서 메소드 호출
-                # 선택한 시간 처리 및 색상 변경
-                for row in range(start_row, end_row + 1):
-                    self.handle_item_click(self.item(row, item.column()))
-        # 단일 셀을 눌렀을 때 실행
-        else:
-            self.handle_item_click(item)
-
-        # 변수 업데이트, 이전에 클릭한 셀을 현재 클릭한 셀로 설정
-        self.last_clicked_item = item
-
-    # 클릭한 셀 처리
-    def handle_item_click(self, item):
-        # 클릭 행 인덱스 가져옴
-        column = item.column()
-        row = item.row()
-
-        day_item = self.horizontalHeaderItem(column)
-        hour_item = self.verticalHeaderItem(row)
-        # 열과 행에 해당하는 헤더 아이템이 있는지 확인
-        if day_item is not None and hour_item is not None:
-            day = day_item.text()
-            hour = hour_item.text()
-
-            selected_time = (day, hour)
-
-            # 선택한 시간 목록이 이전 선택 목록에 해당하는가?
-            if selected_time not in self.unavailable_hours:
-                self.unavailable_hours.append(selected_time)
-                item.setBackground(QColor('blue'))  # 셀 색상을 파란색으로 변경
-            else:
-                self.unavailable_hours.remove(selected_time)  # 시간이 다시 클릭되면 가능한 시간으로 변경
-                item.setBackground(QColor('white'))  # 셀 색상 복원
-
-            # print(f"Unavailable hours: {self.unavailable_hours}")
-        else:
-            print(f"Invalid index: column {column}, row {row}")
-
-    # 셀 초기화
-    def handle_item_clear(self):
-        self.unavailable_hours = []
-        for row in range(self.rowCount()):
-            for column in range(self.columnCount()):
-                item = self.item(row, column)
-                item.setBackground(QColor('white'))
-
-    # 가능 시간 조회
-    def available_hours(self):
-        # key : 요일, value : 모든 시간
-        available_hours_dict = {day: list(self.hours) for day in self.days}
-        # 불가능한 시간을 순회하며 dic에서 제거
-        for (day, hour) in self.unavailable_hours:
-            available_hours_dict[day].remove(hour)
-
-        # 출력부
-        for day in available_hours_dict:
-            print(f"Available hours on {day}: {available_hours_dict[day]}")
-
-
-app = QApplication(sys.argv)
-
-# TimeTable 위젯 생성
-table = TimeTable()
-
-# QPushButton 생성 및 table의 available_hours 메소드에 연결
-btn_get_available_hours = QPushButton("Show Available Hours")
-btn_get_available_hours.clicked.connect(table.available_hours)
-
-btn_clear_available_hours = QPushButton("Clear")
-btn_clear_available_hours.clicked.connect(table.handle_item_clear)
-
-# QVBoxLayout 생성 후 table과 button 추가
-layout = QVBoxLayout()
-layout.addWidget(table)
-layout.addWidget(btn_get_available_hours)
-layout.addWidget(btn_clear_available_hours)
-
-# QWidget 생성, 레이아웃 설정 및 화면에 표시
-window = QWidget()
-window.setLayout(layout)
-window.resize(1280, 720)
-window.show()
-
-sys.exit(app.exec_())
+if __name__ == "__main__":
+    app = QApplication([])  # QApplication 객체를 생성합니다. 이 객체는 프로그램 실행에 필요한 많은 것들을 관리합니다.
+    widget = ListWidget()  # 사용자 정의 ListWidget 객체를 생성합니다.
+    widget.show()  # ListWidget을 보여줍니다.
+    app.exec_()  # 이벤트 루프를 시작합니다. 이는 사용자의 입력을 처리하고 GUI를 실행합니다.
