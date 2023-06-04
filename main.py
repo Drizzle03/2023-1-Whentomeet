@@ -2,6 +2,7 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QLineEdit, QLabel, QStackedWidget
 from PyQt5.QtCore import Qt, QItemSelectionModel
 from api import TimeTable
+from api import logic
 
 class ListWidget(QWidget):
     def __init__(self):
@@ -82,10 +83,13 @@ class ListWidget(QWidget):
     def move_to_page(self):
         selected_items = self.list_widget.selectedItems()  # 현재 선택된 아이템들을 가져옴
         if selected_items:  # 선택된 아이템이 있다면
+            global selected_item
             selected_item = selected_items[0]  # 첫 번째 선택된 아이템을 가져옴
             row = self.list_widget.row(selected_item)  # 선택된 아이템의 행 번호를 가져옴
 
             timetable_widget = TimeTable()  # TimeTable 위젯을 생성
+
+            timetable_widget.setRoom_name(str(selected_item.text())) #
 
             # 선택된 아이템에 대해 저장된 사용 불가 시간을 로드
             timetable_widget.unavailable_hours = self.saved_unavailable_hours[selected_item.text()]
@@ -128,6 +132,8 @@ class ListWidget(QWidget):
             # 선택한 아이템에 대한 사용 불가능한 시간을 저장합니다.
             # timetable_widget의 사용 불가능한 시간 리스트를 복사하여 저장합니다.
             self.saved_unavailable_hours[item_text] = list(timetable_widget.unavailable_hours)
+
+
 
 
 if __name__ == "__main__":
