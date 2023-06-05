@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QVBoxLayout, QPushButton, QWidget, QComboBox, QMessageBox, QLabel, QDialog
+from PyQt5.QtWidgets import QApplication, QTableWidget, QVBoxLayout, QPushButton
+from PyQt5.QtWidgets import QTableWidgetItem, QComboBox, QDialog
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import pyqtSignal
@@ -21,6 +22,7 @@ class TimeTable(QTableWidget):
         self.itemClicked.connect(self.log_time)
 
         self.new_windows = []
+        self.shift_selection = False
 
         # col, row 설정
         self.setColumnCount(7)
@@ -64,13 +66,12 @@ class TimeTable(QTableWidget):
         self.btn_clear_available_hours = QPushButton("Clear")
         self.btn_clear_available_hours.clicked.connect(self.handle_item_clear)
 
-        self.dialog = QDialog()
-
     def log_time(self, item):
         # 현재 눌린 키를 확인,
         modifiers = QApplication.keyboardModifiers()
         # 쉬프트 키와 다른 키가 같이 눌렸는지 확인
         if modifiers == Qt.ShiftModifier and self.last_clicked_item is not None:
+            self.shift_selection = True
             # 시작 값
             start_row = min(item.row(), self.last_clicked_item.row())
             # 끝 값
@@ -84,6 +85,7 @@ class TimeTable(QTableWidget):
                     self.handle_item_click(self.item(row, item.column()))
         # 단일 셀을 눌렀을 때 실행
         else:
+            self.shift_selection = False
             self.handle_item_click(item)
 
         # 변수 업데이트, 이전에 클릭한 셀을 현재 클릭한 셀로 설정
@@ -112,8 +114,9 @@ class TimeTable(QTableWidget):
                 logic.post_item(str(room_name), str(user_name), int(selected_time[1]), int(column))#셀의 정보를 timetable로 보냅니다
 
             else:
-                self.unavailable_hours.remove(selected_time)  # 시간이 다시 클릭되면 가능한 시간으로 변경
-                item.setBackground(QColor('white'))  # 셀 색상 복원
+                if not self.shift_selection:
+                    self.unavailable_hours.remove(selected_time)  # 시간이 다시 클릭되면 가능한 시간으로 변경
+                    item.setBackground(QColor('white'))  # 셀 색상 복원
         self.unavailable_hours_changed.emit()
 
 
@@ -126,36 +129,25 @@ class TimeTable(QTableWidget):
                 item.setBackground(QColor('white'))
         self.unavailable_hours_changed.emit()  # Signal that unavailable_hours has changed
 
-    # 가능 시간 조회
+
+    # 가능시간 출력 창
     def available_hours(self):
-
-        # key : 요일, value : 모든 시간
-        #available_hours_dict = {day: list(self.hours) for day in self.days}
-        # 불가능한 시간을 순회하며 dic에서 제거
-        # for (day, hour) in self.unavailable_hours:
-        #     available_hours_dict[day].remove(hour)
-
-        # 출력부
-        # for day in available_hours_dict:
-        #     print(f"Available hours on {day}: {available_hours_dict[day]}")
-        #메세지 박스에 가능한 시간을 출력합니다.
-
+        self.dialog = QDialog()  # QDialog 대신 QMainWindow를 사용
         table = QTableWidget(self.dialog)
         table.setColumnCount(7)
         table.setRowCount(24)
-        table.resize(1280,700)
+        table.resize(1280, 800)
 
-        self.days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        self.hours = [str(i) for i in range(24)]
-
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        hours = [str(i) for i in range(24)]
 
         for i in range(7):
-            day_item = QTableWidgetItem(self.days[i])
+            day_item = QTableWidgetItem(days[i])
             table.setHorizontalHeaderItem(i, day_item)
 
         # 시간
         for i in range(24):
-            hour_item = QTableWidgetItem(self.hours[i])
+            hour_item = QTableWidgetItem(hours[i])
             table.setVerticalHeaderItem(i, hour_item)
 
         for i in range(24):
@@ -168,15 +160,13 @@ class TimeTable(QTableWidget):
 
         self.dialog.setWindowTitle("result")
         self.dialog.setWindowModality(Qt.ApplicationModal)
-        self.dialog.resize(800,700)
+        self.dialog.setGeometry(319,150,1280,720)
+
+        dialog_layout = QVBoxLayout()  # 대화 상자용 새 QVBoxLayout 생성
+        dialog_layout.addWidget(table)
+        self.dialog.setLayout(dialog_layout)  # QVBoxLayout을 대화 상자의 레이아웃으로 설정
+
         self.dialog.show()
-
-
-
-
-
-
-
 
     def load_unavailable_hours(self):
         for (day, hour) in self.unavailable_hours:

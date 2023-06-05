@@ -11,7 +11,7 @@ class ListWidget(QWidget):
         #윈도우 설정 (제목, 크기)
         self.setWindowTitle("When to meet")
         self.resize(1280, 720)  
-        self.layout = QVBoxLayout() 
+        self.layout = QVBoxLayout() #여러 위젯 수평 배치
 
         self.saved_unavailable_hours = {} # 각 아이템의 불가능 시간 저장 dic
         self.new_windows = []  # 모든 새 창 참조 보관
@@ -28,33 +28,33 @@ class ListWidget(QWidget):
         # 선택된 리스트 삭제 버튼
         self.remove_button = QPushButton("Remove Selected")
         self.remove_button.clicked.connect(self.remove_selected_item)  # remove_selected_item 메서드 호출
-        self.remove_button.setMaximumHeight(50)  # 최대 높이 설정
 
         # 페이지 이동 버튼
         self.move_button = QPushButton("Move to Page")
         self.move_button.clicked.connect(self.move_to_page)  # move_to_page 메서드 호출
-        self.move_button.setMaximumHeight(50)  # 최대 높이 설정
 
         # Stacked Widget 생성, 다른 위젯들을 스택처럼 쌓아놓음
-        # 현재 페이지가 바뀔 때마다 update_current_page 메서드 호출
+        # currentChanged : 페이지가 바뀔 때 신호를 전달함
+        # 즉, 페이지가 바뀔 때마다 update_current_page 메서드 호출
         self.stacked_widget = QStackedWidget()
         self.stacked_widget.currentChanged.connect(self.update_current_page) 
 
-        # 레이아웃 위젯 추가 (첫 번째 수평, place holder, add창 추가)
+        # 레이아웃 위젯 추가 (리스트 위젯, place holder, add창 추가)
         self.layout.addWidget(self.list_widget)
-        add_layout = QHBoxLayout() 
+
+        add_layout = QHBoxLayout() #박스 레이아웃 추가
         add_layout.addWidget(self.add_line_edit) 
         add_layout.addWidget(self.add_button)  
         self.layout.addLayout(add_layout) 
 
-        # 레이아웃 위젯 추가 (두 번째 수평, 삭제, 페이지 이동 창 추가)
+        # 레이아웃 위젯 추가 (삭제, 페이지 이동 창 추가)
         remove_move_layout = QHBoxLayout() 
         remove_move_layout.addWidget(self.remove_button)
         remove_move_layout.addWidget(self.move_button)
         self.layout.addLayout(remove_move_layout)
 
-        self.layout.addWidget(self.stacked_widget)  # stacked_widget을 메인 레이아웃 추가
-
+        # stacked_widget을 메인 레이아웃 추가
+        self.layout.addWidget(self.stacked_widget)
         self.setLayout(self.layout)
 
     def add_item(self):
@@ -87,19 +87,21 @@ class ListWidget(QWidget):
             selected_item = selected_items[0]  # 첫 번째 선택된 아이템을 가져옴
             row = self.list_widget.row(selected_item)  # 선택된 아이템의 행 번호를 가져옴
 
-            timetable_widget = TimeTable()  # TimeTable 위젯을 생성
+            timetable_widget = TimeTable()  # TimeTable 위젯 생성
+            timetable_widget.setRoom_name(str(selected_item.text()))
 
-            timetable_widget.setRoom_name(str(selected_item.text())) #
-
-            # 선택된 아이템에 대해 저장된 사용 불가 시간을 로드
+            # 저장된 사용 불가 시간 값 불가능 리스트에 저장
             timetable_widget.unavailable_hours = self.saved_unavailable_hours[selected_item.text()]
+            #timetable 위젯에 불가능한 시간 정보 칠함
             timetable_widget.load_unavailable_hours()
 
-            # timetable_widget가 생성된 후에 신호를 연결합니다.
+            # timetable_widget가 생성된 후에 신호를 연결
+            # timetable 값이 바뀔 때마다 불가능 시간 저장 해당 함수를 실행함
             timetable_widget.unavailable_hours_changed.connect(
                 lambda: self.save_unavailable_hours(selected_item.text(), timetable_widget))
 
-            # "Show Available Hours" 버튼을 생성하고, 이 버튼이 클릭되면 timetable_widget의 available_hours 메소드를 호출하도록 연결합니다.
+            # "Show Available Hours" 버튼을 생성
+            #  버튼 클릭 시 timetable_widget의 available_hours 메소드를 호출하도록 연결합니다.
             btn_get_available_hours = QPushButton("Show Available Hours")
             btn_get_available_hours.clicked.connect(timetable_widget.available_hours)
 
@@ -114,12 +116,12 @@ class ListWidget(QWidget):
             layout.addWidget(btn_clear_available_hours)  # "Clear" 버튼을 레이아웃에 추가합니다.
             new_window.setLayout(layout)  # 새로운 윈도우의 레이아웃을 방금 생성한 레이아웃으로 설정합니다.
             new_window.setWindowTitle(f"Timetable for {selected_item.text()}")  # 새로운 윈도우의 제목을 설정합니다.
+            print("New window center position:", new_window.geometry().center())  # 새 윈도우의 중심 위치 출력
+
 
             # 새 윈도우의 크기와 위치를 메인 윈도우와 동일하게 설정합니다.
             new_window.setGeometry(self.geometry())
-
             new_window.show()  # 새로운 윈도우를 보여줍니다.
-
             self.new_windows.append(new_window)  # 가비지 컬렉션을 방지하기 위해 새 윈도우에 대한 참조를 유지합니다.
 
     def update_current_page(self, index):
@@ -132,7 +134,6 @@ class ListWidget(QWidget):
             # 선택한 아이템에 대한 사용 불가능한 시간을 저장합니다.
             # timetable_widget의 사용 불가능한 시간 리스트를 복사하여 저장합니다.
             self.saved_unavailable_hours[item_text] = list(timetable_widget.unavailable_hours)
-
 
 
 
